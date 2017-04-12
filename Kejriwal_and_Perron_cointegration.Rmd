@@ -1,0 +1,78 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an attempt to apply Kejriwal and Perron test which is implemented in the R `strucchange` package to find cointegration breakpoints. For cointegrated time series used classic example - GLD & GDX.
+
+
+```{r}
+library(tseries)
+library(quantmod)
+library("strucchange")
+
+from <- "2006-05-23"
+to <- "2008-07-23"
+tickerArray <- c("GLD", "GDX")
+getSymbols(tickerArray, from = from, to = to)
+
+data <- cbind(Cl(GLD), GDX$GDX.Adjusted)
+data <- data[complete.cases(data)]
+names(data) <- c("GLD", "GDX")
+model <- lm(GLD ~ GDX, data)
+
+coint.res <- residuals(lm(GLD ~ GDX, data))
+```
+
+Source data charts
+```{r}
+layout(matrix(1:2, ncol=1))
+candleChart(GLD, multi.col = TRUE, theme = 'white', layout=NULL, TA=NULL)
+candleChart(GDX, multi.col = TRUE, theme = 'white', layout=NULL, TA=NULL)
+```
+
+Check for cointegration
+```{r}
+print(adf.test(coint.res, k = 0))
+```
+
+p-value is small so GLD & GDX in the date range 2006-05-23 ... 2008-07-23 cointegrated. Cointegration charts of Source data
+```{r}
+layout(matrix(1:3, ncol=1))
+plot(GLD ~ GDX, data)
+abline(model)
+plot(coint.res, type = "l")
+plot(as.vector(Cl(GLD)), col = 'blue', type = 'l', main = 'Cointegration GLD & GDX', ylab = 'price')
+lines(as.vector(GDX$GDX.Adjusted * coef(model)[2]+coef(model)[1]), col = 'red', type = 'l')
+```
+
+Now lets extend date range to 2006-05-23 ... 2009-07-23 and check for cointegration
+
+```{r}
+from <- "2006-05-23"
+to <- "2009-07-23"
+tickerArray <- c("GLD", "GDX")
+getSymbols(tickerArray, from = from, to = to)
+
+data <- cbind(Cl(GLD), GDX$GDX.Adjusted)
+data <- data[complete.cases(data)]
+names(data) <- c("GLD", "GDX")
+model <- lm(GLD ~ GDX, data)
+
+coint.res <- residuals(lm(GLD ~ GDX, data))
+print(adf.test(coint.res, k = 0))
+```
+
+p-value is not small so we cannot assure that GLD & GDX cointegrated in the 2006-05-23 ... 2009-07-23 date range. Ok let's try to find breaking dates. breakpoints() worked on one time serie. So for using breakpoint() function for finding breakpoints in cointegration let's use residuals of GLD&GDX Linear regression model. I expect that after finding breakpoints adf.test for every segment will be small so on every segment GLD & GDX will be cointegrated
+
+```{r}
+breakpoints(coint.res ~ 1)
+```
+
+Let's check adf.test for 1st interval 1:165 
+```{r}
+coint.res <- residuals(lm(GLD ~ GDX, data[1:165]))
+print(adf.test(coint.res, k = 0))
+```
+
+On the 1st segment p-value is not small. So we cannot assure that on the 1st segment GLD & GDX cointegrated. And hence we cannot use Kejriwal and Perron test which is implemented in the R `strucchange` package for finding cointegration breakpoints
